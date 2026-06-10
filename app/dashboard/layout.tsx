@@ -116,8 +116,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* User / Sign out */}
         <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-sm font-medium text-blue-700 dark:text-blue-300">
-              {profile?.full_name?.charAt(0)}
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-sm font-medium text-blue-700 dark:text-blue-300 shrink-0">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                profile?.full_name?.charAt(0)
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{profile?.full_name}</p>

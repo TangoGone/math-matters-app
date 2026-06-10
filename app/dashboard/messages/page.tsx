@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/utils/supabase/client"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -16,13 +15,18 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const currentProfileRef = useRef<any>(null)
+  const selectedContactRef = useRef<any>(null)
 
   useEffect(() => {
     loadContacts()
   }, [])
 
   useEffect(() => {
-    if (selectedContact) loadMessages(selectedContact)
+    if (selectedContact) {
+      selectedContactRef.current = selectedContact
+      loadMessages(selectedContact)
+    }
   }, [selectedContact])
 
   useEffect(() => {
@@ -30,10 +34,12 @@ export default function MessagesPage() {
   }, [messages])
 
   useEffect(() => {
-    if (!currentProfile || !selectedContact) return
+    if (!currentProfile) return
+
+    currentProfileRef.current = currentProfile
 
     const channel = supabase
-      .channel("messages")
+      .channel("realtime-messages")
       .on(
         "postgres_changes",
         {
@@ -43,20 +49,36 @@ export default function MessagesPage() {
         },
         (payload) => {
           const msg = payload.new as any
-          if (
-            (msg.sender_profile_id === currentProfile.id &&
-              msg.recipient_profile_id === selectedContact.id) ||
-            (msg.sender_profile_id === selectedContact.id &&
-              msg.recipient_profile_id === currentProfile.id)
-          ) {
-            setMessages((prev) => [...prev, msg])
+          const me = currentProfileRef.current
+          const contact = selectedContactRef.current
+          if (!me || !contact) return
+
+          const isRelevant =
+            (msg.sender_profile_id === me.id && msg.recipient_profile_id === contact.id) ||
+            (msg.sender_profile_id === contact.id && msg.recipient_profile_id === me.id)
+
+          if (isRelevant) {
+            setMessages((prev) => {
+              // Avoid duplicates from optimistic update
+              const exists = prev.some(
+                (m) =>
+                  m.id === msg.id ||
+                  (m.body === msg.body &&
+                    m.sender_profile_id === msg.sender_profile_id &&
+                    Math.abs(new Date(m.sent_at).getTime() - new Date(msg.sent_at).getTime()) < 2000)
+              )
+              if (exists) return prev
+              return [...prev, msg]
+            })
           }
         }
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
-  }, [currentProfile, selectedContact])
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [currentProfile])
 
   async function loadContacts() {
     setLoading(true)
@@ -67,12 +89,13 @@ export default function MessagesPage() {
       .select("*")
       .eq("user_id", user!.id)
       .single()
+
     setCurrentProfile(profile)
+    currentProfileRef.current = profile
 
     let contactProfiles: any[] = []
 
     if (profile.role === "tutor") {
-      // Tutors can message co-directors and their students' parents
       const { data: codirectors } = await supabase
         .from("profiles")
         .select("id, full_name, role, avatar_url")
@@ -84,14 +107,10 @@ export default function MessagesPage() {
         .select("student:student_profile_id(id, full_name, role, avatar_url)")
         .eq("tutor_profile_id", profile.id)
 
-      const students = (pairings || [])
-        .map((p: any) => p.student)
-        .filter(Boolean)
-
+      const students = (pairings || []).map((p: any) => p.student).filter(Boolean)
       contactProfiles = [...(codirectors || []), ...students]
 
     } else if (profile.role === "student") {
-      // Parents can message tutors and co-directors
       const { data: codirectors } = await supabase
         .from("profiles")
         .select("id, full_name, role, avatar_url")
@@ -103,14 +122,10 @@ export default function MessagesPage() {
         .select("tutor:tutor_profile_id(id, full_name, role, avatar_url)")
         .eq("student_profile_id", profile.id)
 
-      const tutors = (pairings || [])
-        .map((p: any) => p.tutor)
-        .filter(Boolean)
-
+      const tutors = (pairings || []).map((p: any) => p.tutor).filter(Boolean)
       contactProfiles = [...(codirectors || []), ...tutors]
 
     } else if (profile.role === "codirector" || profile.role === "operator") {
-      // Co-directors and operators can message everyone
       const { data: everyone } = await supabase
         .from("profiles")
         .select("id, full_name, role, avatar_url")
@@ -120,7 +135,6 @@ export default function MessagesPage() {
       contactProfiles = everyone || []
     }
 
-    // Deduplicate
     const seen = new Set()
     const unique = contactProfiles.filter((c) => {
       if (seen.has(c.id)) return false
@@ -133,23 +147,23 @@ export default function MessagesPage() {
   }
 
   async function loadMessages(contact: any) {
-    if (!currentProfile) return
+    const me = currentProfileRef.current
+    if (!me) return
 
     const { data } = await supabase
       .from("messages")
       .select("*")
       .or(
-        `and(sender_profile_id.eq.${currentProfile.id},recipient_profile_id.eq.${contact.id}),and(sender_profile_id.eq.${contact.id},recipient_profile_id.eq.${currentProfile.id})`
+        `and(sender_profile_id.eq.${me.id},recipient_profile_id.eq.${contact.id}),and(sender_profile_id.eq.${contact.id},recipient_profile_id.eq.${me.id})`
       )
       .order("sent_at", { ascending: true })
 
     setMessages(data || [])
 
-    // Mark messages as read
     await supabase
       .from("messages")
       .update({ read_at: new Date().toISOString() })
-      .eq("recipient_profile_id", currentProfile.id)
+      .eq("recipient_profile_id", me.id)
       .eq("sender_profile_id", contact.id)
       .is("read_at", null)
   }
@@ -158,14 +172,26 @@ export default function MessagesPage() {
     if (!newMessage.trim() || !selectedContact || !currentProfile) return
     setSending(true)
 
-    await supabase.from("messages").insert({
+    const tempId = crypto.randomUUID()
+    const msg = {
+      id: tempId,
       sender_profile_id: currentProfile.id,
       recipient_profile_id: selectedContact.id,
       body: newMessage.trim(),
       sent_at: new Date().toISOString(),
+      read_at: null,
+    }
+
+    setMessages((prev) => [...prev, msg])
+    setNewMessage("")
+
+    await supabase.from("messages").insert({
+      sender_profile_id: msg.sender_profile_id,
+      recipient_profile_id: msg.recipient_profile_id,
+      body: msg.body,
+      sent_at: msg.sent_at,
     })
 
-    setNewMessage("")
     setSending(false)
   }
 
@@ -177,6 +203,19 @@ export default function MessagesPage() {
       case "student": return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
       default: return "bg-gray-100 text-gray-700"
     }
+  }
+
+  function Avatar({ profile, size = "sm" }: { profile: any, size?: "sm" | "md" }) {
+    const dim = size === "sm" ? "w-9 h-9 text-sm" : "w-10 h-10 text-base"
+    return (
+      <div className={`${dim} rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center font-medium text-gray-700 dark:text-gray-300 shrink-0`}>
+        {profile?.avatar_url ? (
+          <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover" />
+        ) : (
+          profile?.full_name?.charAt(0)
+        )}
+      </div>
+    )
   }
 
   if (loading) return <p className="text-gray-500">Loading...</p>
@@ -204,9 +243,7 @@ export default function MessagesPage() {
                     : "hover:bg-gray-50 dark:hover:bg-gray-800"
                 }`}
               >
-                <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0">
-                  {contact.full_name?.charAt(0)}
-                </div>
+                <Avatar profile={contact} />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                     {contact.full_name}
@@ -231,9 +268,7 @@ export default function MessagesPage() {
           <>
             {/* Chat header */}
             <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300">
-                {selectedContact.full_name?.charAt(0)}
-              </div>
+              <Avatar profile={selectedContact} />
               <div>
                 <p className="text-sm font-semibold text-gray-900 dark:text-white">
                   {selectedContact.full_name}

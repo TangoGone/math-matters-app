@@ -42,26 +42,47 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
-    async function loadProfile() {
+    loadProfile()
+  }, [])
+
+  async function loadProfile() {
+    try {
       const { data: { user } } = await supabase.auth.getUser()
+
       if (!user) {
         router.push("/auth/login")
         return
       }
-      const { data } = await supabase
+
+      const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("user_id", user.id)
-        .single()
-      if (!data || data.approval_status !== "approved") {
+        .maybeSingle()
+
+      if (error) {
+        console.error("Profile load error:", error)
+        router.push("/auth/login")
+        return
+      }
+
+      if (!data) {
         router.push("/auth/pending")
         return
       }
+
+      if (data.approval_status !== "approved") {
+        router.push("/auth/pending")
+        return
+      }
+
       setProfile(data)
       setLoading(false)
+    } catch (err) {
+      console.error("Unexpected error loading profile:", err)
+      router.push("/auth/login")
     }
-    loadProfile()
-  }, [])
+  }
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -87,13 +108,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:relative lg:translate-x-0 lg:flex lg:flex-col
       `}>
-        {/* Logo */}
         <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800">
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Math Matters</h1>
           <p className="text-xs text-gray-500 capitalize mt-0.5">{profile?.role}</p>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 px-4 py-4 space-y-1">
           {items.map((item) => (
             <Link
@@ -113,7 +132,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           ))}
         </nav>
 
-        {/* User / Sign out */}
         <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-8 h-8 rounded-full overflow-hidden bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-sm font-medium text-blue-700 dark:text-blue-300 shrink-0">
@@ -137,7 +155,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -145,9 +162,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
       )}
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile header */}
         <header className="lg:hidden flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
           <button
             onClick={() => setMobileOpen(true)}
@@ -160,8 +175,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Math Matters</h1>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
           {children}
         </main>
       </div>

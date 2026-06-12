@@ -22,10 +22,10 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isAuthPage = request.nextUrl.pathname.startsWith('/auth')
+  const isAuthPage = request.nextUrl.pathname.startsWith('/auth') && request.nextUrl.pathname !== '/auth/pending'
   const isRoot = request.nextUrl.pathname === '/'
 
-  if (!user && !isAuthPage) {
+  if (!user && !isAuthPage && request.nextUrl.pathname !== '/auth/pending') {
     return NextResponse.redirect(new URL('/auth/login', request.url))
   }
 

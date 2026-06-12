@@ -1,5 +1,6 @@
 "use client"
 
+import { ProfileModal } from "@/components/profile-modal"
 import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -7,6 +8,7 @@ import { Input } from "@/components/ui/input"
 
 export default function MessagesPage() {
   const supabase = createClient()
+  const [viewingProfileId, setViewingProfileId] = useState<string | null>(null)
   const [currentProfile, setCurrentProfile] = useState<any>(null)
   const [contacts, setContacts] = useState<any[]>([])
   const [selectedContact, setSelectedContact] = useState<any>(null)
@@ -59,7 +61,6 @@ export default function MessagesPage() {
 
           if (isRelevant) {
             setMessages((prev) => {
-              // Avoid duplicates from optimistic update
               const exists = prev.some(
                 (m) =>
                   m.id === msg.id ||
@@ -267,7 +268,10 @@ export default function MessagesPage() {
         ) : (
           <>
             {/* Chat header */}
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center gap-3">
+            <button
+              onClick={() => setViewingProfileId(selectedContact.id)}
+              className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors text-left w-full"
+            >
               <Avatar profile={selectedContact} />
               <div>
                 <p className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -275,7 +279,7 @@ export default function MessagesPage() {
                 </p>
                 <p className="text-xs text-gray-500 capitalize">{selectedContact.role}</p>
               </div>
-            </div>
+            </button>
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
@@ -329,6 +333,8 @@ export default function MessagesPage() {
           </>
         )}
       </div>
+
+      <ProfileModal profileId={viewingProfileId} onClose={() => setViewingProfileId(null)} />
     </div>
   )
 }

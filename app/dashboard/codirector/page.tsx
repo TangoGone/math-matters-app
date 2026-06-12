@@ -5,7 +5,7 @@ import { createClient } from "@/utils/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ProfileModal } from "@/components/profile-modal" // ✅ ADDED
+import { ProfileModal } from "@/components/profile-modal"
 
 export default function CodirectorPage() {
   const supabase = createClient()
@@ -18,8 +18,7 @@ export default function CodirectorPage() {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
   const [pairing, setPairing] = useState(false)
   const [currentProfile, setCurrentProfile] = useState<any>(null)
-
-  const [viewingProfileId, setViewingProfileId] = useState<string | null>(null) // ✅ ADDED
+  const [viewingProfileId, setViewingProfileId] = useState<string | null>(null)
 
   useEffect(() => {
     loadSession()
@@ -116,7 +115,86 @@ export default function CodirectorPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Session Manager</h2>
+        <p className="text-gray-500 mt-1">
+          {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+        </p>
       </div>
+
+      {/* Current Pairings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Today's Pairings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {pairings.length === 0 ? (
+            <p className="text-gray-500 text-sm">No pairings yet for today.</p>
+          ) : (
+            <div className="space-y-3">
+              {pairings.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-800"
+                >
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setViewingProfileId(p.tutor?.id)}
+                      className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+                    >
+                      <div className="w-8 h-8 rounded-full overflow-hidden bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-xs font-medium text-blue-700 dark:text-blue-300">
+                        {p.tutor?.avatar_url ? (
+                          <img src={p.tutor.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          p.tutor?.full_name?.charAt(0)
+                        )}
+                      </div>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        {p.tutor?.full_name}
+                      </span>
+                    </button>
+
+                    <span className="text-gray-400">→</span>
+
+                    <button
+                      onClick={() => setViewingProfileId(p.student?.id)}
+                      className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+                    >
+                      <div className="w-8 h-8 rounded-full overflow-hidden bg-green-100 dark:bg-green-900 flex items-center justify-center text-xs font-medium text-green-700 dark:text-green-300">
+                        {p.student?.avatar_url ? (
+                          <img src={p.student.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          p.student?.full_name?.charAt(0)
+                        )}
+                      </div>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        {p.student?.full_name}
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {p.progress_reports?.length > 0 ? (
+                      <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                        ✓ Report submitted
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">
+                        ⏳ No report yet
+                      </Badge>
+                    )}
+
+                    <button
+                      onClick={() => handleUnpair(p.id)}
+                      className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Create Pairing */}
       <Card>
@@ -124,78 +202,79 @@ export default function CodirectorPage() {
           <CardTitle>Create New Pairing</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-            {/* ✅ UPDATED TUTORS LIST */}
+            {/* Unpaired Tutors */}
             <div>
-              <p className="text-sm font-medium mb-2">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Unpaired Tutors ({unpairedTutors.length})
               </p>
-
               <div className="space-y-1 max-h-48 overflow-y-auto">
-                {unpairedTutors.map((tutor) => (
-                  <div
-                    key={tutor.id}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
-                      selectedTutor === tutor.id
-                        ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
-                        : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                    }`}
-                  >
-                    <button
-                      onClick={() => setSelectedTutor(tutor.id)}
-                      className="flex-1 text-left"
+                {unpairedTutors.length === 0 ? (
+                  <p className="text-sm text-gray-400">All tutors are paired</p>
+                ) : (
+                  unpairedTutors.map((tutor) => (
+                    <div
+                      key={tutor.id}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
+                        selectedTutor === tutor.id
+                          ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                          : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                      }`}
                     >
-                      {tutor.full_name}
-                    </button>
-
-                    <button
-                      onClick={() => setViewingProfileId(tutor.id)}
-                      className="text-xs text-gray-400 hover:text-blue-500 ml-2"
-                    >
-                      View
-                    </button>
-                  </div>
-                ))}
+                      <button onClick={() => setSelectedTutor(tutor.id)} className="flex-1 text-left">
+                        {tutor.full_name}
+                      </button>
+                      <button
+                        onClick={() => setViewingProfileId(tutor.id)}
+                        className="text-xs text-gray-400 hover:text-blue-500 ml-2"
+                      >
+                        View
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
-            {/* ✅ UPDATED STUDENTS LIST */}
+            {/* Unpaired Students */}
             <div>
-              <p className="text-sm font-medium mb-2">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Unpaired Students ({unpairedStudents.length})
               </p>
-
               <div className="space-y-1 max-h-48 overflow-y-auto">
-                {unpairedStudents.map((student) => (
-                  <div
-                    key={student.id}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
-                      selectedStudent === student.id
-                        ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
-                        : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                    }`}
-                  >
-                    <button
-                      onClick={() => setSelectedStudent(student.id)}
-                      className="flex-1 text-left"
+                {unpairedStudents.length === 0 ? (
+                  <p className="text-sm text-gray-400">All students are paired</p>
+                ) : (
+                  unpairedStudents.map((student) => (
+                    <div
+                      key={student.id}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
+                        selectedStudent === student.id
+                          ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
+                          : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                      }`}
                     >
-                      {student.full_name}
-                    </button>
-
-                    <button
-                      onClick={() => setViewingProfileId(student.id)}
-                      className="text-xs text-gray-400 hover:text-blue-500 ml-2"
-                    >
-                      View
-                    </button>
-                  </div>
-                ))}
+                      <button onClick={() => setSelectedStudent(student.id)} className="flex-1 text-left">
+                        {student.full_name}
+                      </button>
+                      <button
+                        onClick={() => setViewingProfileId(student.id)}
+                        className="text-xs text-gray-400 hover:text-blue-500 ml-2"
+                      >
+                        View
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
-
           </div>
+
+          {selectedTutor && selectedStudent && (
+            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
+              Pairing: <strong>{unpairedTutors.find(t => t.id === selectedTutor)?.full_name}</strong> with <strong>{unpairedStudents.find(s => s.id === selectedStudent)?.full_name}</strong>
+            </div>
+          )}
 
           <Button
             onClick={handlePair}
@@ -204,16 +283,22 @@ export default function CodirectorPage() {
           >
             {pairing ? "Creating pairing..." : "Pair Together"}
           </Button>
-
         </CardContent>
       </Card>
 
-      {/* ✅ MODAL ADDED */}
-      <ProfileModal
-        profileId={viewingProfileId}
-        onClose={() => setViewingProfileId(null)}
-      />
+      {/* Unpaired summary */}
+      {(unpairedTutors.length > 0 || unpairedStudents.length > 0) && (
+        <div className="flex gap-4 text-sm text-gray-500">
+          {unpairedTutors.length > 0 && (
+            <span>{unpairedTutors.length} tutor{unpairedTutors.length !== 1 ? "s" : ""} still unpaired</span>
+          )}
+          {unpairedStudents.length > 0 && (
+            <span>{unpairedStudents.length} student{unpairedStudents.length !== 1 ? "s" : ""} still unpaired</span>
+          )}
+        </div>
+      )}
 
+      <ProfileModal profileId={viewingProfileId} onClose={() => setViewingProfileId(null)} />
     </div>
   )
 }

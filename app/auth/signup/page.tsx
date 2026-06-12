@@ -86,7 +86,6 @@ export default function SignupPage() {
 
     setLoading(false)
 
-    // Tutors and students/parents get a quick survey
     if (selectedProfile.role === "tutor" || selectedProfile.role === "student") {
       setStep("survey")
     } else {
@@ -96,7 +95,6 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex bg-gray-950">
-      {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-black flex-col justify-between p-12 border-r border-gray-800">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -127,7 +125,7 @@ export default function SignupPage() {
             ].map((item) => {
               const active =
                 item.id === step ||
-                (item.id === "claim" && (step === "parent")) ||
+                (item.id === "claim" && step === "parent") ||
                 (item.id === "survey" && step === "survey")
               return (
                 <div key={item.id} className="flex items-start gap-4">
@@ -153,7 +151,6 @@ export default function SignupPage() {
         <p className="text-white/20 text-xs">© {new Date().getFullYear()} Math Matters. All rights reserved.</p>
       </div>
 
-      {/* Right panel */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm space-y-8">
           <div className="flex lg:hidden items-center gap-3">

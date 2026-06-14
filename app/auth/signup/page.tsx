@@ -4,6 +4,11 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/utils/supabase/client"
 import { ProfileSurvey } from "@/components/profile-survey"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Loader2, Check } from "lucide-react"
 
 export const dynamic = 'force-dynamic'
 
@@ -41,11 +46,6 @@ export default function SignupPage() {
       .limit(10)
     setResults(data || [])
     setLoading(false)
-  }
-
-  function handleSelectProfile(profile: any) {
-    setSelectedProfile(profile)
-    setError("")
   }
 
   function handleContinueFromClaim() {
@@ -94,308 +94,234 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-gray-950">
-      <div className="hidden lg:flex lg:w-1/2 bg-black flex-col justify-between p-12 border-r border-gray-800">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">M</span>
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm space-y-6">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+            <span className="text-primary-foreground font-bold text-sm">M</span>
           </div>
-          <span className="text-white font-semibold text-lg">Math Matters</span>
+          <h1 className="text-xl font-semibold text-foreground">Math Matters</h1>
         </div>
 
-        <div className="space-y-6">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1">
-              <div className="w-1.5 h-1.5 bg-blue-400 rounded-full" />
-              <span className="text-white/60 text-xs font-medium">Getting started</span>
-            </div>
-            <h1 className="text-4xl font-bold text-white leading-tight">
-              Join the Math<br />Matters community.
-            </h1>
-            <p className="text-white/40 text-base leading-relaxed max-w-sm">
-              Create your account, claim your profile, and get started in minutes.
-            </p>
-          </div>
+        {step === "account" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Create account</CardTitle>
+              <CardDescription>Enter your details to get started</CardDescription>
+            </CardHeader>
 
-          <div className="space-y-3">
-            {[
-              { id: "account", title: "Create your account", desc: "Enter your email and password" },
-              { id: "claim", title: "Claim your profile", desc: "Find your name in the roster" },
-              { id: "survey", title: "Quick survey", desc: "Tell us a bit more (tutors & students)" },
-            ].map((item) => {
-              const active =
-                item.id === step ||
-                (item.id === "claim" && step === "parent") ||
-                (item.id === "survey" && step === "survey")
-              return (
-                <div key={item.id} className="flex items-start gap-4">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
-                    active ? "bg-blue-500 text-white" : "bg-white/5 border border-white/10 text-white/40"
-                  }`}>
-                    {active ? (
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : "·"}
-                  </div>
-                  <div>
-                    <p className="text-white text-sm font-medium">{item.title}</p>
-                    <p className="text-white/30 text-xs mt-0.5">{item.desc}</p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        <p className="text-white/20 text-xs">© {new Date().getFullYear()} Math Matters. All rights reserved.</p>
-      </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm space-y-8">
-          <div className="flex lg:hidden items-center gap-3">
-            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">M</span>
-            </div>
-            <span className="font-semibold text-lg text-white">Math Matters</span>
-          </div>
-
-          {step === "account" && (
-            <>
-              <div className="space-y-1">
-                <h2 className="text-2xl font-bold text-white">Create account</h2>
-                <p className="text-gray-400 text-sm">Enter your details to get started</p>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
 
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-300">Email</label>
-                  <input
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-700 rounded-lg text-sm bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-300">Password</label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-700 rounded-lg text-sm bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-300">Confirm password</label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAccountStep()}
-                    className="w-full px-3.5 py-2.5 border border-gray-700 rounded-lg text-sm bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                </div>
-
-                {error && (
-                  <div className="flex items-start gap-2.5 bg-red-950/50 border border-red-900 rounded-lg px-3.5 py-3">
-                    <svg className="w-4 h-4 text-red-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-sm text-red-400">{error}</p>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleAccountStep}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg text-sm transition-all"
-                >
-                  Continue
-                </button>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               </div>
 
-              <p className="text-center text-sm text-gray-400">
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAccountStep()}
+                />
+              </div>
+
+              {error && (
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+                  {error}
+                </div>
+              )}
+            </CardContent>
+
+            <CardFooter className="flex flex-col gap-3">
+              <Button className="w-full" onClick={handleAccountStep}>
+                Continue
+              </Button>
+              <p className="text-sm text-center text-muted-foreground">
                 Already have an account?{" "}
-                <a href="/auth/login" className="text-blue-400 hover:text-blue-300 font-medium">Sign in</a>
+                <a href="/auth/login" className="text-primary hover:underline font-medium">Sign in</a>
               </p>
-            </>
-          )}
+            </CardFooter>
+          </Card>
+        )}
 
-          {step === "claim" && (
-            <>
-              <div className="space-y-1">
-                <h2 className="text-2xl font-bold text-white">Claim your profile</h2>
-                <p className="text-gray-400 text-sm">Search for your name in our roster</p>
+        {step === "claim" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Claim your profile</CardTitle>
+              <CardDescription>Search for your name in our roster</CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Search your name..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                />
+                <Button variant="outline" onClick={handleSearch} disabled={loading}>
+                  Search
+                </Button>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  <input
-                    placeholder="Search your name..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    className="flex-1 px-3.5 py-2.5 border border-gray-700 rounded-lg text-sm bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                  <button
-                    onClick={handleSearch}
-                    disabled={loading}
-                    className="px-4 py-2.5 border border-gray-700 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-800 transition-all"
-                  >
-                    Search
-                  </button>
+              {results.length > 0 && (
+                <div className="border rounded-md overflow-hidden divide-y">
+                  {results.map((profile) => (
+                    <button
+                      key={profile.id}
+                      onClick={() => { setSelectedProfile(profile); setError("") }}
+                      className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center justify-between ${
+                        selectedProfile?.id === profile.id
+                          ? "bg-primary/10"
+                          : "hover:bg-accent"
+                      }`}
+                    >
+                      <div>
+                        <p className="font-medium text-foreground">{profile.full_name}</p>
+                        <p className="text-muted-foreground text-xs capitalize mt-0.5">{profile.role || "Unassigned"}</p>
+                      </div>
+                      {selectedProfile?.id === profile.id && (
+                        <Check className="w-4 h-4 text-primary shrink-0" />
+                      )}
+                    </button>
+                  ))}
                 </div>
+              )}
 
-                {results.length > 0 && (
-                  <div className="border border-gray-700 rounded-lg overflow-hidden divide-y divide-gray-800">
-                    {results.map((profile) => (
-                      <button
-                        key={profile.id}
-                        onClick={() => handleSelectProfile(profile)}
-                        className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center justify-between ${
-                          selectedProfile?.id === profile.id
-                            ? "bg-blue-950/50"
-                            : "hover:bg-gray-900"
-                        }`}
-                      >
-                        <div>
-                          <p className="font-medium text-white">{profile.full_name}</p>
-                          <p className="text-gray-500 text-xs capitalize mt-0.5">{profile.role || "Unassigned"}</p>
-                        </div>
-                        {selectedProfile?.id === profile.id && (
-                          <svg className="w-4 h-4 text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {results.length === 0 && search && !loading && (
-                  <p className="text-sm text-gray-500 text-center py-3">
-                    No unclaimed profiles found. Contact an administrator.
-                  </p>
-                )}
-
-                {error && (
-                  <div className="flex items-start gap-2.5 bg-red-950/50 border border-red-900 rounded-lg px-3.5 py-3">
-                    <svg className="w-4 h-4 text-red-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-sm text-red-400">{error}</p>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleContinueFromClaim}
-                  disabled={loading || !selectedProfile}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                      </svg>
-                      Working...
-                    </>
-                  ) : "Continue"}
-                </button>
-
-                <button
-                  onClick={() => setStep("account")}
-                  className="w-full text-sm text-gray-500 hover:text-gray-300 transition-colors"
-                >
-                  ← Back
-                </button>
-              </div>
-            </>
-          )}
-
-          {step === "parent" && (
-            <>
-              <div className="space-y-1">
-                <h2 className="text-2xl font-bold text-white">One more thing</h2>
-                <p className="text-gray-400 text-sm">Who's setting up this account?</p>
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  onClick={() => setIsParent(true)}
-                  className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors ${
-                    isParent === true ? "border-blue-500 bg-blue-950/50" : "border-gray-700 hover:bg-gray-900"
-                  }`}
-                >
-                  <p className="font-medium text-white">I'm a parent or guardian</p>
-                  <p className="text-gray-500 text-xs mt-0.5">Setting this up on behalf of {selectedProfile?.full_name}</p>
-                </button>
-
-                <button
-                  onClick={() => setIsParent(false)}
-                  className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors ${
-                    isParent === false ? "border-blue-500 bg-blue-950/50" : "border-gray-700 hover:bg-gray-900"
-                  }`}
-                >
-                  <p className="font-medium text-white">I'm the student</p>
-                  <p className="text-gray-500 text-xs mt-0.5">This is my own account</p>
-                </button>
-
-                {error && (
-                  <div className="flex items-start gap-2.5 bg-red-950/50 border border-red-900 rounded-lg px-3.5 py-3">
-                    <p className="text-sm text-red-400">{error}</p>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleClaim}
-                  disabled={isParent === null || loading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
-                >
-                  {loading ? "Creating account..." : "Continue"}
-                </button>
-
-                <button
-                  onClick={() => setStep("claim")}
-                  className="w-full text-sm text-gray-500 hover:text-gray-300 transition-colors"
-                >
-                  ← Back
-                </button>
-              </div>
-            </>
-          )}
-
-          {step === "survey" && selectedProfile && (
-            <>
-              <div className="space-y-1">
-                <h2 className="text-2xl font-bold text-white">Just a few questions</h2>
-                <p className="text-gray-400 text-sm">
-                  This helps us pair {isParent ? "your child" : "you"} with the right{" "}
-                  {selectedProfile.role === "tutor" ? "students" : "tutor"}.
+              {results.length === 0 && search && !loading && (
+                <p className="text-sm text-muted-foreground text-center py-3">
+                  No unclaimed profiles found. Contact an administrator.
                 </p>
-              </div>
+              )}
 
+              {error && (
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+                  {error}
+                </div>
+              )}
+            </CardContent>
+
+            <CardFooter className="flex flex-col gap-2">
+              <Button
+                className="w-full"
+                onClick={handleContinueFromClaim}
+                disabled={loading || !selectedProfile}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Working...
+                  </>
+                ) : "Continue"}
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={() => setStep("account")}>
+                Back
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+
+        {step === "parent" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>One more thing</CardTitle>
+              <CardDescription>Who's setting up this account?</CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-3">
+              <button
+                onClick={() => setIsParent(true)}
+                className={`w-full text-left rounded-lg border p-4 text-sm transition-colors ${
+                  isParent === true ? "border-primary bg-primary/5" : "hover:bg-accent"
+                }`}
+              >
+                <p className="font-medium text-foreground">I'm a parent or guardian</p>
+                <p className="text-muted-foreground text-xs mt-0.5">Setting this up on behalf of {selectedProfile?.full_name}</p>
+              </button>
+
+              <button
+                onClick={() => setIsParent(false)}
+                className={`w-full text-left rounded-lg border p-4 text-sm transition-colors ${
+                  isParent === false ? "border-primary bg-primary/5" : "hover:bg-accent"
+                }`}
+              >
+                <p className="font-medium text-foreground">I'm the student</p>
+                <p className="text-muted-foreground text-xs mt-0.5">This is my own account</p>
+              </button>
+
+              {error && (
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+                  {error}
+                </div>
+              )}
+            </CardContent>
+
+            <CardFooter className="flex flex-col gap-2">
+              <Button
+                className="w-full"
+                onClick={handleClaim}
+                disabled={isParent === null || loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Creating account...
+                  </>
+                ) : "Continue"}
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={() => setStep("claim")}>
+                Back
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+
+        {step === "survey" && selectedProfile && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Just a few questions</CardTitle>
+              <CardDescription>
+                This helps us pair {isParent ? "your child" : "you"} with the right{" "}
+                {selectedProfile.role === "tutor" ? "students" : "tutor"}.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent>
               <ProfileSurvey
                 profileId={selectedProfile.id}
                 role={selectedProfile.role}
                 isParent={isParent}
                 onComplete={() => router.push("/auth/pending")}
               />
+            </CardContent>
 
-              <button
-                onClick={() => router.push("/auth/pending")}
-                className="w-full text-sm text-gray-500 hover:text-gray-300 transition-colors"
-              >
+            <CardFooter>
+              <Button variant="ghost" className="w-full" onClick={() => router.push("/auth/pending")}>
                 Skip for now
-              </button>
-            </>
-          )}
-        </div>
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
       </div>
     </div>
   )

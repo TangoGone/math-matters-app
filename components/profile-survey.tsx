@@ -2,6 +2,13 @@
 
 import { useState } from "react"
 import { createClient } from "@/utils/supabase/client"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Progress } from "@/components/ui/progress"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Loader2 } from "lucide-react"
 
 const TUTOR_STRENGTHS = [
   "Algebra", "Geometry", "Trigonometry", "Precalculus", "Calculus",
@@ -15,6 +22,8 @@ const STUDENT_INTERESTS = [
 
 const GRADE_LEVELS = ["6th", "7th", "8th", "9th", "10th", "11th", "12th"]
 
+const chip = "rounded-full border data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary"
+
 interface SurveyProps {
   profileId: string
   role: "tutor" | "student"
@@ -24,36 +33,131 @@ interface SurveyProps {
 
 export function ProfileSurvey({ profileId, role, isParent, onComplete }: SurveyProps) {
   const supabase = createClient()
+  const [stepIndex, setStepIndex] = useState(0)
   const [saving, setSaving] = useState(false)
 
   const [gradeLevel, setGradeLevel] = useState("")
   const [cityState, setCityState] = useState("")
   const [topics, setTopics] = useState<string[]>([])
-  const [neurodivergent, setNeurodivergent] = useState<string>("")
-  const [comfortableAutism, setComfortableAutism] = useState<string>("")
+  const [neurodivergent, setNeurodivergent] = useState("")
+  const [comfortableAutism, setComfortableAutism] = useState("")
   const [notes, setNotes] = useState("")
 
   const topicOptions = role === "tutor" ? TUTOR_STRENGTHS : STUDENT_INTERESTS
-
-  // Pronoun helpers for student/parent phrasing
-  const subject = role === "student" && isParent ? "your child" : "you"
   const possessive = role === "student" && isParent ? "your child's" : "your"
-  const verbIs = role === "student" && isParent ? "is" : "are"
+  const subject = role === "student" && isParent ? "your child" : "you"
 
-  function toggleTopic(topic: string) {
-    setTopics((prev) =>
-      prev.includes(topic) ? prev.filter((t) => t !== topic) : [...prev, topic]
-    )
-  }
+  const steps = [
+    // Step 1 — Grade level
+    <div key="grade" className="space-y-3">
+      <Label className="text-base font-medium">
+        {role === "tutor"
+          ? "What grade level are you most comfortable teaching?"
+          : `What grade is ${subject} in?`}
+      </Label>
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        value={gradeLevel}
+        onValueChange={(val) => val && setGradeLevel(val)}
+        className="flex flex-wrap justify-start gap-2"
+      >
+        {GRADE_LEVELS.map((g) => (
+          <ToggleGroupItem key={g} value={g} className={chip}>
+            {g}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>,
 
-  async function handleSubmit() {
+    // Step 2 — Location
+    <div key="location" className="space-y-3">
+      <Label htmlFor="city-state" className="text-base font-medium">
+        City and State
+      </Label>
+      <Input
+        id="city-state"
+        placeholder="e.g. Irvine, CA"
+        value={cityState}
+        onChange={(e) => setCityState(e.target.value)}
+      />
+    </div>,
+
+    // Step 3 — Topics
+    <div key="topics" className="space-y-3">
+      <div className="space-y-1">
+        <Label className="text-base font-medium">
+          {role === "tutor"
+            ? "What are your strengths for teaching?"
+            : `What math topics is ${possessive}${isParent ? " child" : ""} interested in or working on?`}
+        </Label>
+        <p className="text-sm text-muted-foreground">Select all that apply</p>
+      </div>
+      <ToggleGroup
+        type="multiple"
+        variant="outline"
+        value={topics}
+        onValueChange={setTopics}
+        className="flex flex-wrap justify-start gap-2"
+      >
+        {topicOptions.map((topic) => (
+          <ToggleGroupItem key={topic} value={topic} className={chip}>
+            {topic}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>,
+
+    // Step 4 — Role-specific question
+    <div key="role-specific" className="space-y-3">
+      <Label className="text-base font-medium">
+        {role === "tutor"
+          ? "Are you comfortable teaching students on the autism spectrum?"
+          : isParent
+            ? "Is your child neurodivergent or do they have any learning differences we should know about?"
+            : "Are you neurodivergent or do you have any learning differences we should know about?"}
+      </Label>
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        value={role === "tutor" ? comfortableAutism : neurodivergent}
+        onValueChange={(val) => {
+          if (!val) return
+          if (role === "tutor") setComfortableAutism(val)
+          else setNeurodivergent(val)
+        }}
+        className="flex flex-wrap justify-start gap-2"
+      >
+        {(role === "tutor" ? ["Yes", "No", "Not sure"] : ["Yes", "No", "Prefer not to say"]).map((opt) => (
+          <ToggleGroupItem key={opt} value={opt} className={chip}>
+            {opt}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>,
+
+    // Step 5 — Notes
+    <div key="notes" className="space-y-3">
+      <Label htmlFor="notes" className="text-base font-medium">
+        Anything else we should know?
+      </Label>
+      <Textarea
+        id="notes"
+        placeholder="Optional notes..."
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        rows={5}
+      />
+    </div>,
+  ]
+
+  const totalSteps = steps.length
+  const progress = ((stepIndex + 1) / totalSteps) * 100
+
+  async function handleFinish() {
     setSaving(true)
 
-    const survey: any = {
-      topics,
-      notes,
-    }
-
+    const survey: any = { topics, notes }
     if (role === "tutor") {
       survey.comfortable_autism = comfortableAutism
     } else {
@@ -62,154 +166,54 @@ export function ProfileSurvey({ profileId, role, isParent, onComplete }: SurveyP
 
     await supabase
       .from("profiles")
-      .update({
-        grade_level: gradeLevel,
-        city_state: cityState,
-        survey,
-      })
+      .update({ grade_level: gradeLevel, city_state: cityState, survey })
       .eq("id", profileId)
 
     setSaving(false)
     onComplete()
   }
 
+  function handleNext() {
+    if (stepIndex === totalSteps - 1) {
+      handleFinish()
+    } else {
+      setStepIndex((i) => i + 1)
+    }
+  }
+
+  function handleBack() {
+    setStepIndex((i) => Math.max(0, i - 1))
+  }
+
   return (
     <div className="space-y-6">
-      {/* Grade level */}
       <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-200">
-          {role === "tutor"
-            ? "What grade levels are you comfortable teaching?"
-            : `What grade is ${subject} in?`}
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {GRADE_LEVELS.map((g) => (
-            <button
-              key={g}
-              type="button"
-              onClick={() => setGradeLevel(g)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                gradeLevel === g
-                  ? "bg-blue-600 border-blue-600 text-white"
-                  : "border-gray-700 text-gray-300 hover:border-gray-500"
-              }`}
-            >
-              {g}
-            </button>
-          ))}
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Step {stepIndex + 1} of {totalSteps}</span>
+          <span>{Math.round(progress)}%</span>
         </div>
+        <Progress value={progress} className="h-1.5" />
       </div>
 
-      {/* City, State */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-200">
-          City and State
-        </label>
-        <input
-          type="text"
-          placeholder="e.g. Irvine, CA"
-          value={cityState}
-          onChange={(e) => setCityState(e.target.value)}
-          className="w-full px-3.5 py-2.5 border border-gray-700 rounded-lg text-sm bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-        />
+      <div className="min-h-[120px]">
+        {steps[stepIndex]}
       </div>
 
-      {/* Topics */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-200">
-          {role === "tutor"
-            ? "What are your strengths for teaching?"
-            : `What math topics is ${possessive} ${role === "student" ? "" : ""}${isParent ? "child" : ""} interested in or working on?`}
-        </label>
-        <p className="text-xs text-gray-500">Select all that apply</p>
-        <div className="flex flex-wrap gap-2">
-          {topicOptions.map((topic) => (
-            <button
-              key={topic}
-              type="button"
-              onClick={() => toggleTopic(topic)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                topics.includes(topic)
-                  ? "bg-blue-600 border-blue-600 text-white"
-                  : "border-gray-700 text-gray-300 hover:border-gray-500"
-              }`}
-            >
-              {topic}
-            </button>
-          ))}
-        </div>
+      <div className="flex gap-2">
+        {stepIndex > 0 && (
+          <Button variant="outline" onClick={handleBack} className="flex-1">
+            Back
+          </Button>
+        )}
+        <Button onClick={handleNext} disabled={saving} className="flex-1">
+          {saving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Saving...
+            </>
+          ) : stepIndex === totalSteps - 1 ? "Finish setup" : "Next"}
+        </Button>
       </div>
-
-      {/* Role-specific question */}
-      {role === "tutor" ? (
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-200">
-            Are you comfortable teaching students on the autism spectrum?
-          </label>
-          <div className="flex gap-2">
-            {["Yes", "No", "Not sure"].map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => setComfortableAutism(opt)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                  comfortableAutism === opt
-                    ? "bg-blue-600 border-blue-600 text-white"
-                    : "border-gray-700 text-gray-300 hover:border-gray-500"
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-200">
-            {isParent
-              ? "Is your child neurodivergent or do they have any learning differences we should know about?"
-              : "Are you neurodivergent or do you have any learning differences we should know about?"}
-          </label>
-          <div className="flex gap-2">
-            {["Yes", "No", "Prefer not to say"].map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => setNeurodivergent(opt)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                  neurodivergent === opt
-                    ? "bg-blue-600 border-blue-600 text-white"
-                    : "border-gray-700 text-gray-300 hover:border-gray-500"
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Notes */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-200">
-          Anything else we should know?
-        </label>
-        <textarea
-          placeholder="Optional notes..."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          className="w-full px-3.5 py-2.5 border border-gray-700 rounded-lg text-sm bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
-        />
-      </div>
-
-      <button
-        onClick={handleSubmit}
-        disabled={saving}
-        className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium py-2.5 rounded-lg text-sm transition-all"
-      >
-        {saving ? "Saving..." : "Finish setup"}
-      </button>
     </div>
   )
 }

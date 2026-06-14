@@ -4,7 +4,10 @@ import { useEffect, useState } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ProfileModal } from "@/components/profile-modal"
+import { SessionCalendar } from "@/components/session-calendar"
+import { format } from "date-fns"
 
 export default function ParentPage() {
   const supabase = createClient()
@@ -17,6 +20,7 @@ export default function ParentPage() {
   const [selectedTutor, setSelectedTutor] = useState("")
   const [tutors, setTutors] = useState<any[]>([])
   const [viewingProfileId, setViewingProfileId] = useState<string | null>(null)
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null)
 
   useEffect(() => {
     loadReports()
@@ -75,6 +79,11 @@ export default function ParentPage() {
     )
     setTutors(uniqueTutors)
 
+    // Default-select most recent date with a report
+    if (merged.length > 0 && merged[0].pairing?.session?.session_date) {
+      setSelectedCalendarDate(merged[0].pairing.session.session_date)
+    }
+
     setLoading(false)
   }
 
@@ -119,7 +128,97 @@ export default function ParentPage() {
     }
   }
 
+  function ReportCard({ report }: { report: any }) {
+    const engagement = engagementLabel(report.engagement_rating)
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div>
+              <button
+                onClick={() => setViewingProfileId(report.pairing?.tutor?.id)}
+                className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+              >
+                <div className="w-7 h-7 rounded-full overflow-hidden bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-xs font-medium text-blue-700 dark:text-blue-300">
+                  {report.pairing?.tutor?.avatar_url ? (
+                    <img src={report.pairing.tutor.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    report.pairing?.tutor?.full_name?.charAt(0)
+                  )}
+                </div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {report.pairing?.tutor?.full_name}
+                </p>
+              </button>
+              <p className="text-xs text-gray-500 mt-1 ml-9">
+                {report.pairing?.session?.session_date
+                  ? new Date(report.pairing.session.session_date).toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "Unknown date"}
+              </p>
+            </div>
+            <Badge className={engagement.color}>
+              {engagement.label}
+            </Badge>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-3 pt-0">
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              Topics Covered
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+              {report.topics_covered}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                What Went Well
+              </p>
+              <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                {report.went_well}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                Needs Work
+              </p>
+              <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                {report.needs_work}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              Next Session Goals
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+              {report.next_session_goals}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   if (loading) return <p className="text-gray-500">Loading...</p>
+
+  const highlightedDates = reports
+    .map((r) => r.pairing?.session?.session_date)
+    .filter(Boolean)
+
+  const reportsForSelectedDate = selectedCalendarDate
+    ? reports.filter((r) => r.pairing?.session?.session_date === selectedCalendarDate)
+    : []
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -157,164 +256,141 @@ export default function ParentPage() {
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Filter Reports</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="space-y-1 flex-1">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                From
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="space-y-1 flex-1">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                To
-              </label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
+      <Tabs defaultValue="calendar">
+        <TabsList>
+          <TabsTrigger value="calendar">Calendar</TabsTrigger>
+          <TabsTrigger value="all">All Reports</TabsTrigger>
+        </TabsList>
 
-          {tutors.length > 1 && (
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Filter by tutor
-              </label>
-              <select
-                value={selectedTutor}
-                onChange={(e) => setSelectedTutor(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All tutors</option>
-                {tutors.map((t: any) => (
-                  <option key={t.id} value={t.id}>
-                    {t.full_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {(startDate || endDate || selectedTutor) && (
-            <button
-              onClick={clearFilters}
-              className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline"
-            >
-              Clear all filters
-            </button>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Reports */}
-      {filtered.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-gray-500">
-              {reports.length === 0
-                ? "No progress reports yet."
-                : "No reports match your filters."}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {filtered.map((report) => {
-            const engagement = engagementLabel(report.engagement_rating)
-            return (
-              <Card key={report.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <button
-                        onClick={() => setViewingProfileId(report.pairing?.tutor?.id)}
-                        className="flex items-center gap-2 hover:opacity-70 transition-opacity"
-                      >
-                        <div className="w-7 h-7 rounded-full overflow-hidden bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-xs font-medium text-blue-700 dark:text-blue-300">
-                          {report.pairing?.tutor?.avatar_url ? (
-                            <img src={report.pairing.tutor.avatar_url} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            report.pairing?.tutor?.full_name?.charAt(0)
-                          )}
-                        </div>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {report.pairing?.tutor?.full_name}
-                        </p>
-                      </button>
-                      <p className="text-xs text-gray-500 mt-1 ml-9">
-                        {report.pairing?.session?.session_date
-                          ? new Date(report.pairing.session.session_date).toLocaleDateString("en-US", {
-                              weekday: "long",
-                              month: "long",
-                              day: "numeric",
-                              year: "numeric",
-                            })
-                          : "Unknown date"}
-                      </p>
-                    </div>
-                    <Badge className={engagement.color}>
-                      {engagement.label}
-                    </Badge>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="space-y-3 pt-0">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                      Topics Covered
-                    </p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
-                      {report.topics_covered}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                        What Went Well
-                      </p>
-                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
-                        {report.went_well}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                        Needs Work
-                      </p>
-                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
-                        {report.needs_work}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                      Next Session Goals
-                    </p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
-                      {report.next_session_goals}
-                    </p>
-                  </div>
+        {/* Calendar View */}
+        <TabsContent value="calendar" className="space-y-4 mt-4">
+          {reports.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-gray-500">No progress reports yet.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <Card>
+                <CardContent className="pt-6">
+                  <SessionCalendar
+                    highlightedDates={highlightedDates}
+                    selectedDate={selectedCalendarDate}
+                    onSelectDate={setSelectedCalendarDate}
+                    accent="blue"
+                  />
+                  <p className="text-xs text-gray-400 mt-3 text-center">
+                    Highlighted days had a session with a tutor
+                  </p>
                 </CardContent>
               </Card>
-            )
-          })}
-        </div>
-      )}
+
+              {selectedCalendarDate && (
+                <div className="space-y-4">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {format(new Date(selectedCalendarDate), "EEEE, MMMM d, yyyy")}
+                  </p>
+                  {reportsForSelectedDate.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-8 text-center">
+                        <p className="text-gray-500 text-sm">No report found for this date.</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    reportsForSelectedDate.map((report) => (
+                      <ReportCard key={report.id} report={report} />
+                    ))
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </TabsContent>
+
+        {/* All Reports View */}
+        <TabsContent value="all" className="space-y-4 mt-4">
+          {/* Filters */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Filter Reports</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="space-y-1 flex-1">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    From
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="space-y-1 flex-1">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    To
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {tutors.length > 1 && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Filter by tutor
+                  </label>
+                  <select
+                    value={selectedTutor}
+                    onChange={(e) => setSelectedTutor(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All tutors</option>
+                    {tutors.map((t: any) => (
+                      <option key={t.id} value={t.id}>
+                        {t.full_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {(startDate || endDate || selectedTutor) && (
+                <button
+                  onClick={clearFilters}
+                  className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </CardContent>
+          </Card>
+
+          {filtered.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-gray-500">
+                  {reports.length === 0
+                    ? "No progress reports yet."
+                    : "No reports match your filters."}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {filtered.map((report) => (
+                <ReportCard key={report.id} report={report} />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <ProfileModal profileId={viewingProfileId} onClose={() => setViewingProfileId(null)} />
     </div>

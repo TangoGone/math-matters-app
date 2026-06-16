@@ -1,16 +1,7 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
-
-const fontSans = localFont({
-  src: "../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2",
-  variable: "--font-sans",
-});
-
-const fontMono = localFont({
-  src: "../node_modules/geist/dist/fonts/geist-mono/GeistMono-Variable.woff2",
-  variable: "--font-geist-mono",
-});
 
 export const metadata: Metadata = {
   title: "Math Matters",
@@ -24,7 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`${fontSans.variable} ${fontMono.variable} antialiased bg-background text-foreground`}>
+      <body className={`${GeistSans.variable} ${GeistMono.variable} antialiased bg-background text-foreground`}>
         {children}
       </body>
     </html>

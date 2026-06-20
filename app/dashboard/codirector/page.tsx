@@ -3,26 +3,42 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ProfileModal } from "@/components/profile-modal"
+import { Search, X, ArrowRight } from "lucide-react"
 
 export default function CodirectorPage() {
   const supabase = createClient()
   const [session, setSession] = useState<any>(null)
   const [pairings, setPairings] = useState<any[]>([])
-  const [unpairedTutors, setUnpairedTutors] = useState<any[]>([])
-  const [unpairedStudents, setUnpairedStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedTutor, setSelectedTutor] = useState<string | null>(null)
-  const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
-  const [pairing, setPairing] = useState(false)
   const [currentProfile, setCurrentProfile] = useState<any>(null)
   const [viewingProfileId, setViewingProfileId] = useState<string | null>(null)
 
+  // Search state
+  const [tutorSearch, setTutorSearch] = useState("")
+  const [studentSearch, setStudentSearch] = useState("")
+  const [tutorResults, setTutorResults] = useState<any[]>([])
+  const [studentResults, setStudentResults] = useState<any[]>([])
+  const [selectedTutor, setSelectedTutor] = useState<any>(null)
+  const [selectedStudent, setSelectedStudent] = useState<any>(null)
+  const [pairing, setPairing] = useState(false)
+
+  useEffect(() => { loadSession() }, [])
+
   useEffect(() => {
-    loadSession()
-  }, [])
+    if (!tutorSearch.trim()) { setTutorResults([]); return }
+    const t = setTimeout(() => searchTutors(tutorSearch), 250)
+    return () => clearTimeout(t)
+  }, [tutorSearch])
+
+  useEffect(() => {
+    if (!studentSearch.trim()) { setStudentResults([]); return }
+    const t = setTimeout(() => searchStudents(studentSearch), 250)
+    return () => clearTimeout(t)
+  }, [studentSearch])
 
   async function loadSession() {
     setLoading(true)
@@ -41,7 +57,7 @@ export default function CodirectorPage() {
       .from("sessions")
       .select("*")
       .eq("session_date", today)
-      .single()
+      .maybeSingle()
 
     if (!existingSession) {
       const { data: newSession } = await supabase
@@ -65,26 +81,35 @@ export default function CodirectorPage() {
       .eq("session_id", existingSession.id)
 
     setPairings(pairingData || [])
+    setLoading(false)
+  }
 
-    const { data: allTutors } = await supabase
+  async function searchTutors(query: string) {
+    const pairedTutorIds = pairings.map((p: any) => p.tutor_profile_id)
+
+    const { data } = await supabase
       .from("profiles")
       .select("id, full_name, avatar_url")
       .eq("role", "tutor")
       .eq("approval_status", "approved")
+      .ilike("full_name", `%${query}%`)
+      .limit(8)
 
-    const { data: allStudents } = await supabase
+    setTutorResults((data || []).filter(t => !pairedTutorIds.includes(t.id)))
+  }
+
+  async function searchStudents(query: string) {
+    const pairedStudentIds = pairings.map((p: any) => p.student_profile_id)
+
+    const { data } = await supabase
       .from("profiles")
       .select("id, full_name, avatar_url")
       .eq("role", "student")
       .eq("approval_status", "approved")
+      .ilike("full_name", `%${query}%`)
+      .limit(8)
 
-    const pairedTutorIds = (pairingData || []).map((p: any) => p.tutor_profile_id)
-    const pairedStudentIds = (pairingData || []).map((p: any) => p.student_profile_id)
-
-    setUnpairedTutors((allTutors || []).filter(t => !pairedTutorIds.includes(t.id)))
-    setUnpairedStudents((allStudents || []).filter(s => !pairedStudentIds.includes(s.id)))
-
-    setLoading(false)
+    setStudentResults((data || []).filter(s => !pairedStudentIds.includes(s.id)))
   }
 
   async function handlePair() {
@@ -93,13 +118,17 @@ export default function CodirectorPage() {
 
     await supabase.from("pairings").insert({
       session_id: session.id,
-      tutor_profile_id: selectedTutor,
-      student_profile_id: selectedStudent,
+      tutor_profile_id: selectedTutor.id,
+      student_profile_id: selectedStudent.id,
       created_by: currentProfile?.id,
     })
 
     setSelectedTutor(null)
     setSelectedStudent(null)
+    setTutorSearch("")
+    setStudentSearch("")
+    setTutorResults([])
+    setStudentResults([])
     await loadSession()
     setPairing(false)
   }
@@ -109,84 +138,92 @@ export default function CodirectorPage() {
     await loadSession()
   }
 
-  if (loading) return <p className="text-gray-500">Loading session...</p>
+  function Avatar({ profile, color = "blue" }: { profile: any, color?: string }) {
+    const colors: any = {
+      blue: "bg-blue-500/20 text-blue-400",
+      green: "bg-green-500/20 text-green-400",
+    }
+    return (
+      <div className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-xs font-semibold shrink-0 ${colors[color]}`}>
+        {profile?.avatar_url ? (
+          <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          profile?.full_name?.charAt(0)
+        )}
+      </div>
+    )
+  }
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading session...</p>
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Session Manager</h2>
-        <p className="text-gray-500 mt-1">
+        <h2 className="text-2xl font-bold text-foreground">Session Manager</h2>
+        <p className="text-muted-foreground mt-1">
           {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
         </p>
       </div>
 
-      {/* Current Pairings */}
+      {/* Today's Pairings */}
       <Card>
         <CardHeader>
-          <CardTitle>Today's Pairings</CardTitle>
+          <CardTitle className="text-base">
+            Today's Pairings
+            {pairings.length > 0 && (
+              <Badge variant="secondary" className="ml-2">{pairings.length}</Badge>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {pairings.length === 0 ? (
-            <p className="text-gray-500 text-sm">No pairings yet for today.</p>
+            <p className="text-muted-foreground text-sm">No pairings yet for today.</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {pairings.map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-800"
+                  className="flex items-center justify-between px-3 py-2.5 rounded-lg border border-border bg-muted/30"
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
                     <button
                       onClick={() => setViewingProfileId(p.tutor?.id)}
-                      className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+                      className="flex items-center gap-2 hover:opacity-70 transition-opacity min-w-0"
                     >
-                      <div className="w-8 h-8 rounded-full overflow-hidden bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-xs font-medium text-blue-700 dark:text-blue-300">
-                        {p.tutor?.avatar_url ? (
-                          <img src={p.tutor.avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          p.tutor?.full_name?.charAt(0)
-                        )}
-                      </div>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <Avatar profile={p.tutor} color="blue" />
+                      <span className="text-sm font-medium text-foreground truncate">
                         {p.tutor?.full_name}
                       </span>
                     </button>
 
-                    <span className="text-gray-400">→</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
 
                     <button
                       onClick={() => setViewingProfileId(p.student?.id)}
-                      className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+                      className="flex items-center gap-2 hover:opacity-70 transition-opacity min-w-0"
                     >
-                      <div className="w-8 h-8 rounded-full overflow-hidden bg-green-100 dark:bg-green-900 flex items-center justify-center text-xs font-medium text-green-700 dark:text-green-300">
-                        {p.student?.avatar_url ? (
-                          <img src={p.student.avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          p.student?.full_name?.charAt(0)
-                        )}
-                      </div>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <Avatar profile={p.student} color="green" />
+                      <span className="text-sm font-medium text-foreground truncate">
                         {p.student?.full_name}
                       </span>
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 shrink-0 ml-4">
                     {p.progress_reports?.length > 0 ? (
-                      <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-                        ✓ Report submitted
+                      <Badge className="bg-green-500/10 text-green-400 border-green-500/20 border">
+                        ✓ Report in
                       </Badge>
                     ) : (
-                      <Badge className="bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">
-                        ⏳ No report yet
+                      <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20 border">
+                        ⏳ Pending
                       </Badge>
                     )}
-
                     <button
                       onClick={() => handleUnpair(p.id)}
-                      className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                      className="text-muted-foreground hover:text-destructive transition-colors"
                     >
-                      Remove
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -199,80 +236,114 @@ export default function CodirectorPage() {
       {/* Create Pairing */}
       <Card>
         <CardHeader>
-          <CardTitle>Create New Pairing</CardTitle>
+          <CardTitle className="text-base">Create New Pairing</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Unpaired Tutors */}
-            <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Unpaired Tutors ({unpairedTutors.length})
-              </p>
-              <div className="space-y-1 max-h-48 overflow-y-auto">
-                {unpairedTutors.length === 0 ? (
-                  <p className="text-sm text-gray-400">All tutors are paired</p>
-                ) : (
-                  unpairedTutors.map((tutor) => (
-                    <div
-                      key={tutor.id}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
-                        selectedTutor === tutor.id
-                          ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
-                          : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                      }`}
-                    >
-                      <button onClick={() => setSelectedTutor(tutor.id)} className="flex-1 text-left">
-                        {tutor.full_name}
-                      </button>
-                      <button
-                        onClick={() => setViewingProfileId(tutor.id)}
-                        className="text-xs text-gray-400 hover:text-blue-500 ml-2"
-                      >
-                        View
-                      </button>
+            {/* Tutor search */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">Tutor</p>
+              {selectedTutor ? (
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-primary bg-primary/5">
+                  <div className="flex items-center gap-2">
+                    <Avatar profile={selectedTutor} color="blue" />
+                    <span className="text-sm font-medium text-foreground">{selectedTutor.full_name}</span>
+                  </div>
+                  <button
+                    onClick={() => { setSelectedTutor(null); setTutorSearch("") }}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search tutors..."
+                    value={tutorSearch}
+                    onChange={(e) => setTutorSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                  {tutorResults.length > 0 && (
+                    <div className="absolute top-full mt-1 w-full z-10 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
+                      {tutorResults.map((tutor) => (
+                        <button
+                          key={tutor.id}
+                          onClick={() => { setSelectedTutor(tutor); setTutorSearch(""); setTutorResults([]) }}
+                          className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-accent transition-colors text-left"
+                        >
+                          <Avatar profile={tutor} color="blue" />
+                          <span className="text-foreground">{tutor.full_name}</span>
+                        </button>
+                      ))}
                     </div>
-                  ))
-                )}
-              </div>
+                  )}
+                  {tutorSearch && tutorResults.length === 0 && (
+                    <div className="absolute top-full mt-1 w-full z-10 bg-popover border border-border rounded-lg shadow-lg px-3 py-2.5">
+                      <p className="text-sm text-muted-foreground">No available tutors found</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Unpaired Students */}
-            <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Unpaired Students ({unpairedStudents.length})
-              </p>
-              <div className="space-y-1 max-h-48 overflow-y-auto">
-                {unpairedStudents.length === 0 ? (
-                  <p className="text-sm text-gray-400">All students are paired</p>
-                ) : (
-                  unpairedStudents.map((student) => (
-                    <div
-                      key={student.id}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
-                        selectedStudent === student.id
-                          ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
-                          : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                      }`}
-                    >
-                      <button onClick={() => setSelectedStudent(student.id)} className="flex-1 text-left">
-                        {student.full_name}
-                      </button>
-                      <button
-                        onClick={() => setViewingProfileId(student.id)}
-                        className="text-xs text-gray-400 hover:text-blue-500 ml-2"
-                      >
-                        View
-                      </button>
+            {/* Student search */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">Student</p>
+              {selectedStudent ? (
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-primary bg-primary/5">
+                  <div className="flex items-center gap-2">
+                    <Avatar profile={selectedStudent} color="green" />
+                    <span className="text-sm font-medium text-foreground">{selectedStudent.full_name}</span>
+                  </div>
+                  <button
+                    onClick={() => { setSelectedStudent(null); setStudentSearch("") }}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search students..."
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                  {studentResults.length > 0 && (
+                    <div className="absolute top-full mt-1 w-full z-10 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
+                      {studentResults.map((student) => (
+                        <button
+                          key={student.id}
+                          onClick={() => { setSelectedStudent(student); setStudentSearch(""); setStudentResults([]) }}
+                          className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-accent transition-colors text-left"
+                        >
+                          <Avatar profile={student} color="green" />
+                          <span className="text-foreground">{student.full_name}</span>
+                        </button>
+                      ))}
                     </div>
-                  ))
-                )}
-              </div>
+                  )}
+                  {studentSearch && studentResults.length === 0 && (
+                    <div className="absolute top-full mt-1 w-full z-10 bg-popover border border-border rounded-lg shadow-lg px-3 py-2.5">
+                      <p className="text-sm text-muted-foreground">No available students found</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
           {selectedTutor && selectedStudent && (
-            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
-              Pairing: <strong>{unpairedTutors.find(t => t.id === selectedTutor)?.full_name}</strong> with <strong>{unpairedStudents.find(s => s.id === selectedStudent)?.full_name}</strong>
+            <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20">
+              <Avatar profile={selectedTutor} color="blue" />
+              <span className="text-sm font-medium text-foreground">{selectedTutor.full_name}</span>
+              <ArrowRight className="w-4 h-4 text-muted-foreground" />
+              <Avatar profile={selectedStudent} color="green" />
+              <span className="text-sm font-medium text-foreground">{selectedStudent.full_name}</span>
             </div>
           )}
 
@@ -285,18 +356,6 @@ export default function CodirectorPage() {
           </Button>
         </CardContent>
       </Card>
-
-      {/* Unpaired summary */}
-      {(unpairedTutors.length > 0 || unpairedStudents.length > 0) && (
-        <div className="flex gap-4 text-sm text-gray-500">
-          {unpairedTutors.length > 0 && (
-            <span>{unpairedTutors.length} tutor{unpairedTutors.length !== 1 ? "s" : ""} still unpaired</span>
-          )}
-          {unpairedStudents.length > 0 && (
-            <span>{unpairedStudents.length} student{unpairedStudents.length !== 1 ? "s" : ""} still unpaired</span>
-          )}
-        </div>
-      )}
 
       <ProfileModal profileId={viewingProfileId} onClose={() => setViewingProfileId(null)} />
     </div>

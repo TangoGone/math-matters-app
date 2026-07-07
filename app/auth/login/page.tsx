@@ -90,8 +90,8 @@ export default function LoginPage() {
         @keyframes floatDrift {
           0%   { transform: translateY(0px) translateX(0px) rotate(0deg); opacity: 0; }
           10%  { opacity: 1; }
-          45%  { transform: translateY(-30px) translateX(14px) rotate(3deg); opacity: 0.12; }
-          55%  { transform: translateY(-34px) translateX(10px) rotate(-2deg); opacity: 0.12; }
+          45%  { transform: translateY(-30px) translateX(14px) rotate(3deg); opacity: 0.06; }
+          55%  { transform: translateY(-34px) translateX(10px) rotate(-2deg); opacity: 0.06; }
           90%  { opacity: 1; }
           100% { transform: translateY(0px) translateX(0px) rotate(0deg); opacity: 0; }
         }
@@ -126,7 +126,7 @@ export default function LoginPage() {
           <img
             src="/logo.png"
             alt="Math Matters"
-            className="h-20 w-auto object-contain"
+            className="h-16 w-auto object-contain"
             onError={(e) => {
               const target = e.target as HTMLImageElement
               target.style.display = "none"

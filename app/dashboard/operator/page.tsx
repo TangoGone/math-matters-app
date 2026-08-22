@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { usePresence } from "@/hooks/use-presence"
 import { createClient } from "@/utils/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -41,6 +42,9 @@ export default function OperatorPage() {
     applyFilters()
   }, [search, roleFilter, statusFilter, sortBy, profiles])
 
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(null)
+  const { isOnline } = usePresence(currentProfileId)
+
   async function loadData() {
     setLoading(true)
 
@@ -53,6 +57,16 @@ export default function OperatorPage() {
       .from("seasons")
       .select("*")
       .order("created_at", { ascending: false })
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: me } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .single()
+      if (me) setCurrentProfileId(me.id)
+    }
 
     setProfiles(profileData || [])
     setSeasons(seasonData || [])
@@ -292,9 +306,16 @@ export default function OperatorPage() {
                               profile.full_name?.charAt(0)
                             )}
                           </div>
-                          <span className={`font-medium text-foreground ${profile.approval_status === "approved" ? "group-hover:text-primary transition-colors" : ""}`}>
-                            {profile.full_name}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${
+                              isOnline(profile.id)
+                                ? "bg-green-400"
+                                : "bg-muted-foreground/30"
+                            }`} />
+                            <span className={`font-medium text-foreground ${profile.approval_status === "approved" ? "group-hover:text-primary transition-colors" : ""}`}>
+                              {profile.full_name}
+                            </span>
+                          </div>
                         </button>
                       </td>
                       <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell">
